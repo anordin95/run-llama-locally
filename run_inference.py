@@ -91,10 +91,11 @@ end = time.time()
 print(f"Inference finished. Time elapsed: {end-start:.2f}s.")
 # Take the first batch-output. Recall there was only one batch-input.
 output_activations = output_batch[0]
-# Softmax across the possible output indices (i.e. tokens) to obtain a probability
-# distribution over possible output tokens.
+# Each output-index has an associated activation vector with the same dimensionality 
+# as the token-vocabulary. Take the softmax of each vector to obtain a probability
+# distribution over all possible tokens.
 softmaxed_output = torch.nn.functional.softmax(output_activations, dim=1)
-# Select the index (i.e. token number) that has been assigned the highest probability value.
+# Select the index (i.e. the token) that has been assigned the highest probability value.
 output_tokens = torch.argmax(softmaxed_output, dim=1).tolist()
 # Find the probability associated with each token that was chosen.
 output_token_probabilities = torch.max(softmaxed_output, dim=1).values.tolist()
