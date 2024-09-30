@@ -17,9 +17,9 @@ import torch.distributed
 MODEL_NAME = "Llama3.2-1B-Instruct" 
 print(f"Using model: {MODEL_NAME}.")
 
-# If, like me, you've moved the downloaded model-weights elsewhere, update this variable.
-# LLAMA_MODELS_DIR = Path.home() / ".llama"
-LLAMA_MODELS_DIR = Path.home() / "src" / "Llama-LLM" / "downloaded-weights"
+# If you've moved the downloaded model-weights elsewhere, update this variable.
+# For example, I moved them to: Path.home() / "src" / "Llama-LLM" / "downloaded-weights"
+LLAMA_MODELS_DIR = Path.home() / ".llama" / "checkpoints"
 
 # This is the prompt/input you'd like to pass to the model.
 INPUT_STRING = "Hi. Who are you?"

@@ -12,7 +12,7 @@ I was a bit surprised Meta didn't publish an example way to simply invoke one of
 
 2. `pip install -r requirements.txt`
 
-3. `cd llama-models; pip install -e .`
+3. `cd llama-models; pip install -e .; cd ..`
 
 4. `python run_inference.py`
 
@@ -22,9 +22,9 @@ The three global variables in run_inference.py: `MODEL_NAME`, `LLAMA_MODELS_DIR`
 
 #### Technical Overview 
 
-The minimal set of dependencies I found includes `torch` (perhaps, obviously) and a lesser known library also published by Meta: `fairscale`, which implements a variety of highly scalable/parallelizable analogues of `torch` operators.
+The minimal set of dependencies I found includes `torch` (perhaps, obviously), a lesser known library also published by Meta: `fairscale`, which implements a variety of highly scalable/parallelizable analogues of `torch` operators and `blobfile`, which implements a general file I/O mechanism that Meta's Tokenizer implementation uses.
 
-Meta provides the language-model weights in a simple way, but a model-architecture to drop them into is still needed. This is provided, in a less obvious way, in the [llama_models](https://github.com/meta-llama/llama-models) repo. The model-architecture class therein relies on both `torch` and `fairscale` and expects each, specifically `torch.distributed` and `fairscale`, to be initialized appropriately. 
+Meta provides the language-model weights in a simple way, but a model-architecture to drop them into is still needed. This is provided, in a less obvious way, in the [llama_models](https://github.com/meta-llama/llama-models) repo. The model-architecture class therein relies on both `torch` and `fairscale` and expects each, specifically `torch.distributed` and `fairscale`, to be initialized appropriately. The use of CUDA is hard-coded in a few places in the official repo. I changed that and bundled that version here (as a git submodule).
 
 With those initializations squared away, the model-architecture class can be instantiated. Though, that model is largely a blank slate until we then drop the weights in.
 
