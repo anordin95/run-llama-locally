@@ -1,0 +1,3 @@
+[submodule "llama-models"]
+	path = llama-models
+	url = https://github.com/anordin95/llama-models
