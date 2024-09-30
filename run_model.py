@@ -54,13 +54,13 @@ model_hyperparams_path = LLAMA_MODELS_DIR / f"{MODEL_NAME}/params.json"
 with open(model_hyperparams_path, "r") as fh:
     model_hyperparams_dict = json.load(fh)
 model_hyperparams = ModelArgs(**model_hyperparams_dict)
-llama_model = Llama3Model(model_hyperparams).to(DEVICE)
+llama_model = Llama3Model(model_hyperparams, DEVICE)
 
 """
 Load saved weights into the model architecture.
 """
 model_weights_path = LLAMA_MODELS_DIR / f"{MODEL_NAME}/consolidated.00.pth"
-tensor_name_to_tensor_weights = torch.load(model_weights_path, map_location=DEVICE)
+tensor_name_to_tensor_weights = torch.load(model_weights_path, weights_only=True, map_location=DEVICE)
 llama_model.load_state_dict(tensor_name_to_tensor_weights)
 
 """
@@ -68,7 +68,7 @@ Prepare the tokenizer. This is the component responsible for transforming plain-
 a sequence of class-labels, i.e. strings to long-ints.
 """
 token_dictionary_path = LLAMA_MODELS_DIR / f"{MODEL_NAME}/tokenizer.model"
-tokenizer = Tokenizer(model_path=token_dictionary_path)
+tokenizer = Tokenizer(model_path=str(token_dictionary_path))
 
 """
 Select the output-string and convert it to a series of tokens within a batch.
