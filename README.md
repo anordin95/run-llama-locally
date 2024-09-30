@@ -18,7 +18,7 @@ I was a bit surprised Meta didn't publish an example way to simply invoke one of
 
 #### Arguments
 
-The three global variables in run_inference.py: `MODEL_NAME`, `LLAMA_MODELS_DIR` and `INPUT_STRING` take the values you'd guess they do. They should be modified as you see fit.
+The three global variables in run_inference.py: `MODEL_NAME`, `LLAMA_MODELS_DIR` and `INPUT_STRING` take the values you'd expect (there are adjacent comments with examples and more details too). They should be modified as you see fit.
 
 #### Technical Overview 
 
