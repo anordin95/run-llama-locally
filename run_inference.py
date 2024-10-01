@@ -174,9 +174,9 @@ for beam_idx in range(beam_width):
             beam_sequence_log_probability += math.log(most_likely_token_probability)
             
             next_most_likely_token_str = tokenizer.decode(t=[next_most_likely_token])
-            if next_most_likely_token_str == "\n":
-                # escape the back-slash to prevent odd formatting.
-                next_most_likely_token_str = "\\n"
+            if "\n" in next_most_likely_token_str:
+                # escape the back-slash to prevent odd formatting in the later print statement.
+                next_most_likely_token_str = next_most_likely_token_str.replace("\n", "\\n")
             
             # Pad the numeric representation so the ensuing print-statement's contents are aligned across lines.
             # For example, 126 -> "126  "; 1 -> "1    "; 52947 -> "52947". The longest token is 6 digits: 128000.
