@@ -30,49 +30,44 @@ INPUT_STRING = "Hi. Tell me about yoruself. Who are you? What do you do?"
 DEVICE = torch.device("cpu")
 
 
+# ==========================================================================
 # Both the torch.distributed and fairscale packages need to be initialized
 # prior to being able to create an instance of the Llama Model class.
 
-""" ==========================================================================
-Initialize the torch.distributed sub-package. 
-world_size: The number of processes to use.
-rank: the current processes' index.
-store: a distributed key-value store that all workers should have access to.
-"""
+# Initialize the torch.distributed sub-package. 
+# world_size: The number of processes to use.
+# rank: the current processes' index.
+# store: a distributed key-value store that all workers should have access to.
 torch.distributed.init_process_group(world_size=1, rank=0, store=torch.distributed.HashStore())
 
-""" ==========================================================================
-Initialize the fairscale package.
-"""
+# Initialize the fairscale package.
 initialize_model_parallel(model_parallel_size_=1)
 
-""" ==========================================================================
-Initialize a model. That is, load the architecture, but not
-the weights.
-"""
+# ==========================================================================
+# Load the model & model-weights.
+
+# Initialize a model. That is, load the architecture, but not
+# the weights.
 model_hyperparams_path = LLAMA_MODELS_DIR / f"{MODEL_NAME}/params.json"
 with open(model_hyperparams_path, "r") as fh:
     model_hyperparams_dict = json.load(fh)
 model_hyperparams = ModelArgs(**model_hyperparams_dict)
 llama_model = Llama3Model(model_hyperparams, DEVICE)
 
-""" ==========================================================================
-Load saved weights into the model architecture.
-"""
+# Load saved weights into the model architecture.
 model_weights_path = LLAMA_MODELS_DIR / f"{MODEL_NAME}/consolidated.00.pth"
 tensor_name_to_tensor_weights = torch.load(model_weights_path, weights_only=True, map_location=DEVICE)
 llama_model.load_state_dict(tensor_name_to_tensor_weights)
 
-""" ==========================================================================
-Prepare the tokenizer. This is the component responsible for transforming plain-English into
-a sequence of class-labels, i.e. strings to long-ints.
-"""
+# ==========================================================================
+# Setup and use the tokenizer.
+
+# Prepare the tokenizer. This is the component responsible for transforming plain-English into
+# a sequence of class-labels, i.e. strings to long-ints.
 token_dictionary_path = LLAMA_MODELS_DIR / f"{MODEL_NAME}/tokenizer.model"
 tokenizer = Tokenizer(model_path=str(token_dictionary_path))
 
-""" ==========================================================================
-Select the output-string and convert it to a series of tokens within a batch.
-"""
+# Convert the input-string to a series of tokens within a batch.
 # bos and eos are booleans indicating whether a beginning-of-sequence 
 # and end-of-sequence token should be prepended and appended, respectively,
 # to the returned token-sequence.
@@ -81,9 +76,9 @@ input_tokens = tokenizer.encode(s=INPUT_STRING, bos=True, eos=True)
 # The model expects int64's (i.e. LongTensor). The extra [] are there to add a batch-dimension.
 input_batch = torch.LongTensor([input_tokens]).to(DEVICE)
 
-""" ==========================================================================
-Run inference.
-"""
+# ==========================================================================
+# Run inference.
+
 next_most_likely_token = None
 output_token_sequence = []
 end_of_sequence_token = 128001
@@ -131,8 +126,7 @@ while next_most_likely_token != end_of_sequence_token:
 
     print(f"The model thinks token {next_most_likely_token_str} is the most likely token to come next with p: {most_likely_token_probability:.3f}.")
 
-"""
-Decode the output tokens.
-"""
+
+# Decode the output tokens.
 decoded_tokens = tokenizer.decode(t=output_token_sequence)
 print(f"Those predicted tokens correspond to this string: \n'{decoded_tokens}'.")
