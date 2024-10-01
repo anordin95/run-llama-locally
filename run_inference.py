@@ -1,6 +1,7 @@
 import json
 import time
 from pathlib import Path
+import math
 
 from llama_models.llama3.reference_impl.model import Transformer as Llama3Model
 from llama_models.llama3.api.args import ModelArgs
@@ -74,59 +75,86 @@ tokenizer = Tokenizer(model_path=str(token_dictionary_path))
 print(f"Converting input-string: '{INPUT_STRING}' to tokens.")
 input_tokens = tokenizer.encode(s=INPUT_STRING, bos=True, eos=True)
 # The model expects int64's (i.e. LongTensor). The extra [] are there to add a batch-dimension.
-input_batch = torch.LongTensor([input_tokens]).to(DEVICE)
+input_batch = torch.LongTensor([input_tokens + [128000]]).to(DEVICE)
 
 # ==========================================================================
 # Run inference.
 
+class PossibleTokenSequence:
+    def __init__(self, starting_sequence: torch.LongTensor):
+        self.token_sequence = starting_sequence
+        self.log_p = 0.0
+        self.initial_sequence_length = starting_sequence.shape[-1]
+
+    def append_token(self, token: torch.LongTensor, p: float):
+        # The [None, None] adds two empty dimensions to ensure the dimensions of the inputs
+        # -- token_sequence and token -- are the same.
+        self.token_sequence = torch.cat([self.token_sequence, token[None, None]], dim=1)
+        self.log_p += math.log(p)
+    
+    def get_output_sequence(self):
+        return self.token_sequence[:, self.initial_sequence_length:]
+
+beam_width = 7
+possible_token_sequences = [PossibleTokenSequence(input_batch) for _ in range(beam_width)]
+
 next_most_likely_token = None
-output_token_sequence = []
 end_of_sequence_token = 128001
-max_seq_len = 64
+max_seq_len = 256
+is_first_inference_pass = True
 
 while next_most_likely_token != end_of_sequence_token:
-
-    if len(output_token_sequence) >= max_seq_len:
+        
+    current_seq_len = possible_token_sequences[0].get_output_sequence().shape[-1]
+    if current_seq_len >= max_seq_len:
         print(f"Reached maximum sequence length of: {max_seq_len}.")
         break
-
-    # What does start_pos mean?
-    output_batch = llama_model(input_batch, start_pos=0)
-
-    # Take the first batch-output. Recall there was only one batch-input.
-    output_activations = output_batch[0]
-
-    # The output is now shape (num-input-tokens, vocabulary-size). Each row
-    # represents the next-token prediction scores of the given index. For example
-    # row 2 represents the 3rd token prediction scores given tokens 1 and 2.
-    # We only care about the final next-token prediction, i.e. the next token
-    # given our input-token sequence.
-    next_word_activations = output_activations[-1]
-
-
-    # Softmax the outputs, then select the most likely token at each step.
-    # The next-word activation vector has the same dimensionality as the 
-    # token-vocabulary. Take the softmax over the vector to obtain a probability
-    # distribution over possible tokens.
-    softmaxed_output = next_word_activations.softmax(dim=0)
     
-    # Select the index (i.e. the token) that has been assigned the highest probability value.
-    next_most_likely_token = torch.argmax(softmaxed_output, dim=0)
-    next_most_likely_token_str = tokenizer.decode(t=[next_most_likely_token])
+    for beam_idx in range(beam_width):
 
-    # Keep track of the most-likely tokens. And, add the predicted token to the input.
-    output_token_sequence.append(next_most_likely_token)
-    
-    # The [None, None] adds two empty dimensions to ensure the dimensions of the inputs
-    # -- input-batch and next-token -- are the same.
-    input_batch = torch.cat([input_batch, next_most_likely_token[None, None]], dim=1)
+        possible_token_sequence = possible_token_sequences[beam_idx]
 
-    # Find the probability associated with each token that was chosen.
-    most_likely_token_probability = torch.max(softmaxed_output, dim=0).values.item()
+        # What does start_pos mean?
+        output_batch = llama_model(possible_token_sequence.token_sequence, start_pos=0)
 
-    print(f"The model thinks token {next_most_likely_token_str} is the most likely token to come next with p: {most_likely_token_probability:.3f}.")
+        # Take the first batch-output. Recall there was only one batch-input.
+        output_activations = output_batch[0]
 
+        # The output is now shape (num-input-tokens, vocabulary-size). Each row
+        # represents the next-token prediction scores of the given index. For example
+        # row 2 represents the 3rd token prediction scores given tokens 1 and 2.
+        # We only care about the final next-token prediction, i.e. the next token
+        # given our input-token sequence.
+        next_token_activations = output_activations[-1]
+
+        # Softmax the outputs, then select the most likely token at each step.
+        # The next-word activation vector has the same dimensionality as the 
+        # token-vocabulary. Take the softmax over the vector to obtain a probability
+        # distribution over possible tokens.
+        next_token_probabilities = next_token_activations.softmax(dim=0)
+        
+        if is_first_inference_pass:
+            # On the first pass, we want to initialize the beam-sequences with the most likely {beam-width}
+            # possible tokens.
+            next_most_likely_token = torch.topk(next_token_probabilities, k=beam_width, dim=0).indices[beam_idx]
+        else:
+            # Select the index (i.e. the token) that has been assigned the highest probability value.
+            next_most_likely_token = torch.argmax(next_token_probabilities, dim=0)
+
+        next_most_likely_token_str = tokenizer.decode(t=[next_most_likely_token])
+
+        # Find the probability associated with the token that was chosen.
+        most_likely_token_probability = torch.max(next_token_probabilities, dim=0).values.item()
+        
+        # Keep track of the most-likely tokens. And, add the predicted token to the input.
+        possible_token_sequence.append_token(token=next_most_likely_token, p=most_likely_token_probability)
+
+        print(f"For beam: {beam_idx + 1}, the model thinks token {next_most_likely_token_str} is the most likely token to come next with p: {most_likely_token_probability:.3f}.")
+
+    is_first_inference_pass = False
 
 # Decode the output tokens.
-decoded_tokens = tokenizer.decode(t=output_token_sequence)
-print(f"Those predicted tokens correspond to this string: \n'{decoded_tokens}'.")
+for beam_idx in range(beam_width):
+    possible_token_sequence = possible_token_sequences[beam_idx]
+    decoded_tokens = tokenizer.decode(t=possible_token_sequence.get_output_sequence().squeeze().tolist())
+    print(f"\n\nBeam: {beam_idx+1} predicted tokens correspond to this string: \n'{decoded_tokens}' with log-p: {possible_token_sequence.log_p:.4f}.")
