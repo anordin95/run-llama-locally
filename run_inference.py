@@ -157,22 +157,29 @@ for beam_idx in range(beam_width):
                 # On the first pass, we want to initialize the beam-sequences with the most likely {beam-width}
                 # possible tokens. That is, beam 1 begins with the most likely token, beam 2 begins with
                 # the 2nd most likely token, etc.
-                next_most_likely_token = torch.topk(next_token_probabilities, k=beam_width, dim=0).indices[beam_idx]
-                most_likely_token_probability = torch.topk(next_token_probabilities, k=beam_width, dim=0).values[beam_idx]
+                next_most_likely_token = torch.topk(next_token_probabilities, k=beam_width, dim=0).indices[beam_idx].item()
+                most_likely_token_probability = torch.topk(next_token_probabilities, k=beam_width, dim=0).values[beam_idx].item()
                 
                 is_beams_first_inference_pass = False
 
             else:
                 # Select the index (i.e. the token) that has been assigned the highest probability value.
-                next_most_likely_token = torch.argmax(next_token_probabilities, dim=0)
+                next_most_likely_token = torch.argmax(next_token_probabilities, dim=0).item()
                 most_likely_token_probability = torch.max(next_token_probabilities, dim=0).values.item()
             
             # Keep track of the most-likely tokens and the overall sequence log-probability.
-            beam_sequence = append_token(beam_sequence, next_most_likely_token.item())
+            beam_sequence = append_token(beam_sequence, next_most_likely_token)
             beam_sequence_log_probability += math.log(most_likely_token_probability)
             
             next_most_likely_token_str = tokenizer.decode(t=[next_most_likely_token])
-            print(f"The model thinks token {next_most_likely_token_str} is the most likely token to come next with p: {most_likely_token_probability:.3f}.")
+            if next_most_likely_token_str == "\n":
+                # escape the back-slash to prevent odd formatting.
+                next_most_likely_token_str = "\\n"
+            
+            # Pad the numeric representation so the ensuing print-statement's contents are aligned across lines.
+            # For example, 126 -> "126  "; 1 -> "1    "; 52947 -> "52947". The longest token is 6 digits: 128000.
+            next_most_likely_token_padded = f"{next_most_likely_token}{' ' * (6 - len(str(next_most_likely_token)))}"
+            print(f"next token {next_most_likely_token_padded}-> '{next_most_likely_token_str}' with p: {most_likely_token_probability:.3f}.")
 
 # Decode each beam's output sequence.
 for beam_idx in range(beam_width):
