@@ -23,7 +23,7 @@ print(f"Using model: {MODEL_NAME}.")
 LLAMA_MODELS_DIR = Path.home() / ".llama" / "checkpoints"
 
 # This is the prompt/input you'd like to pass to the model.
-INPUT_STRING = "Hi. Who are you? What do you do? Please tell me about yourself. Do try to be concise."
+INPUT_STRING = "Please tell me a funny, quirky short-story."
 
 # mps stands for Metal Performance Shaders, i.e. Apple GPU's.
 # Something went awry when I tried using mps; the model output a tensor 
@@ -83,85 +83,102 @@ input_batch = torch.LongTensor([input_tokens + [beginning_of_sequence_token]]).t
 # ==========================================================================
 # Run inference.
 
-class TokenSequenceAndProbability:
-    def __init__(self, starting_sequence: torch.LongTensor):
-        # Starting sequence is expected to have shape (1, N) where N is the sequence-length.
-        self.token_sequence = starting_sequence
-        self.log_p = 0.0
-        self.initial_sequence_length = starting_sequence.shape[-1]
-
-    def append_token(self, token: torch.LongTensor, p: float):
-        # The [None, None] adds two empty dimensions to ensure the dimensions of the inputs
-        # -- token_sequence and token -- are the same.
-        self.token_sequence = torch.cat([self.token_sequence, token[None, None]], dim=1)
-        self.log_p += math.log(p)
-    
-    def get_output_sequence(self):
-        return self.token_sequence[:, self.initial_sequence_length:]
-
-    def get_output_sequence_length(self):
-        return self.get_output_sequence().shape[-1]
-
-beam_width = 7
-possible_sequences_and_probs = [TokenSequenceAndProbability(input_batch) for _ in range(beam_width)]
+beam_width = 5
+beam_idx_to_token_sequence = {}
+beam_idx_to_sequence_log_probability = {}
 
 end_of_sequence_token = 128_001
-max_seq_len = 256
+max_seq_len = 512
+
+input_sequence_length = input_batch.shape[-1]
+
+
+def append_token(tensor: torch.Tensor, token: int):
+    """Helper function for appending a scalar token to a 2-D tensor.
+    It's assumed the leading dimension of the tensor is 1, e.g. (1,N).
+    """
+    assert tensor.shape[0] == 1
+    # The [None, None] adds two empty dimensions to ensure the dimensions 
+    # of token and tensor match.
+    token = torch.tensor(token, dtype=torch.int64)[None, None]
+    return torch.cat([tensor, token], dim=1)
 
 for beam_idx in range(beam_width):
     
     print(f"\nComputing beam: {beam_idx + 1}'s sequence.")
     
-    possible_sequence_and_prob = possible_sequences_and_probs[beam_idx]
-    next_most_likely_token = None
+    beam_sequence_log_probability = 0.0
+    beam_sequence = input_batch
     is_beams_first_inference_pass = True
+    next_most_likely_token = None
+    
+    while True:
 
-    while next_most_likely_token != end_of_sequence_token:    
+        # Ignore the input-sequence/prompt.
+        output_sequence_length = beam_sequence.shape[-1] - input_sequence_length
+        
+        if (
+            next_most_likely_token == end_of_sequence_token or
+            output_sequence_length >= max_seq_len
+        ):
+            if output_sequence_length >= max_seq_len:
+                print(f"Reached maximum sequence length of: {max_seq_len}.")
 
-        if possible_sequence_and_prob.get_output_sequence_length() >= max_seq_len:
-            print(f"Reached maximum sequence length of: {max_seq_len}.")
-            break
+            # Ignore the input/prompt tokens.
+            beam_output_sequence = beam_sequence[:, input_sequence_length:]
+            # Store the token-sequence & log-probability.
+            beam_idx_to_token_sequence[beam_idx] = beam_output_sequence.squeeze().tolist()
+            beam_idx_to_sequence_log_probability[beam_idx] = beam_sequence_log_probability
             
-        output_batch = llama_model(possible_sequence_and_prob.token_sequence, start_pos=0)
-        
-        # Take the first batch-output. Recall there was only one batch-input.
-        output_activations = output_batch[0]
+            break
 
-        # The output is now shape (num-input-tokens, vocabulary-size). Each row
-        # represents the next-token prediction scores of the given index. For example
-        # row 2 represents the 3rd token prediction scores given tokens 1 and 2.
-        # We only care about the final next-token prediction, i.e. the next token
-        # given our input-token sequence.
-        next_token_activations = output_activations[-1]
-        
-        # Softmax the outputs, then select the most likely token at each step.
-        # The next-word activation vector has the same dimensionality as the 
-        # token-vocabulary. Take the softmax over the vector to obtain a probability
-        # distribution over possible tokens.
-        next_token_probabilities = next_token_activations.softmax(dim=0)
-
-        if is_beams_first_inference_pass:
-            # On the first pass, we want to initialize the beam-sequences with the most likely {beam-width}
-            # possible tokens. That is, beam 1 begins with the most likely token, beam 2 begins with
-            # the 2nd most likely token, etc.
-            next_most_likely_token = torch.topk(next_token_probabilities, k=beam_width, dim=0).indices[beam_idx]
-            is_beams_first_inference_pass = False
         else:
-            # Select the index (i.e. the token) that has been assigned the highest probability value.
-            next_most_likely_token = torch.argmax(next_token_probabilities, dim=0)
-        
-        next_most_likely_token_str = tokenizer.decode(t=[next_most_likely_token])
+                
+            output_batch = llama_model(beam_sequence, start_pos=0)
+            
+            # Take the first batch-output. Recall there was only one batch-input.
+            output_activations = output_batch[0]
 
-        # Find the probability associated with the token that was chosen.
-        most_likely_token_probability = torch.max(next_token_probabilities, dim=0).values.item()
-        
-        # Keep track of the most-likely tokens. And, add the predicted token to the input.
-        possible_sequence_and_prob.append_token(token=next_most_likely_token, p=most_likely_token_probability)
+            # The output is now shape (num-input-tokens, vocabulary-size). Each row
+            # represents the next-token prediction scores of the given index. For example
+            # row 2 represents the 3rd token prediction scores given tokens 1 and 2.
+            # We only care about the final next-token prediction, i.e. the next token
+            # given our input-token sequence.
+            next_token_activations = output_activations[-1]
+            
+            # Softmax the outputs, then select the most likely token at each step.
+            # The next-word activation vector has the same dimensionality as the 
+            # token-vocabulary. Take the softmax over the vector to obtain a probability
+            # distribution over possible tokens.
+            next_token_probabilities = next_token_activations.softmax(dim=0)
 
-        print(f"The model thinks token {next_most_likely_token_str} is the most likely token to come next with p: {most_likely_token_probability:.3f}.")
+            if is_beams_first_inference_pass:
+                
+                # On the first pass, we want to initialize the beam-sequences with the most likely {beam-width}
+                # possible tokens. That is, beam 1 begins with the most likely token, beam 2 begins with
+                # the 2nd most likely token, etc.
+                next_most_likely_token = torch.topk(next_token_probabilities, k=beam_width, dim=0).indices[beam_idx]
+                most_likely_token_probability = torch.topk(next_token_probabilities, k=beam_width, dim=0).values[beam_idx]
+                
+                is_beams_first_inference_pass = False
+
+            else:
+                # Select the index (i.e. the token) that has been assigned the highest probability value.
+                next_most_likely_token = torch.argmax(next_token_probabilities, dim=0)
+                most_likely_token_probability = torch.max(next_token_probabilities, dim=0).values.item()
+            
+            # Keep track of the most-likely tokens and the overall sequence log-probability.
+            beam_sequence = append_token(beam_sequence, next_most_likely_token.item())
+            beam_sequence_log_probability += math.log(most_likely_token_probability)
+            
+            next_most_likely_token_str = tokenizer.decode(t=[next_most_likely_token])
+            print(f"The model thinks token {next_most_likely_token_str} is the most likely token to come next with p: {most_likely_token_probability:.3f}.")
 
 # Decode each beam's output sequence.
 for beam_idx in range(beam_width):
-    possible_sequence_and_prob = possible_sequences_and_probs[beam_idx]
-    decoded_tokens = tokenizer.decode(t=possible_sequence_and_prob.get_output_sequence().squeeze().tolist())
-    print(f"\n\nBeam: {beam_idx+1} predicted tokens with total log-p: {possible_sequence_and_prob.log_p:.4f} that correspond to this string: \n'{decoded_tokens}'.")
+    
+    beam_sequence = beam_idx_to_token_sequence[beam_idx]
+    beam_log_probability = beam_idx_to_sequence_log_probability[beam_idx]
+    decoded_beam_tokens = tokenizer.decode(t=beam_sequence)
+
+    print(f"\n\nBeam: {beam_idx+1} predicted tokens with joint log-p: {beam_log_probability:.2f} that correspond to this string: \n{decoded_beam_tokens}")
