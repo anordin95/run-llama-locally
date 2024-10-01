@@ -16,7 +16,7 @@ import torch.distributed
 # Select the model-weights you'd like to use; some options are: "Llama3.2-1B",
 # "Llama3.2-1B-Instruct", "Llama3.2-3B", etc.
 MODEL_NAME = "Llama3.2-1B-Instruct" 
-print(f"Using model: {MODEL_NAME}.")
+print(f"\nUsing model: {MODEL_NAME}.\n")
 
 # If you've moved the downloaded model-weights elsewhere, update this variable.
 # For example, I moved them to: Path.home() / "src" / "Llama-LLM" / "downloaded-weights"
@@ -75,6 +75,8 @@ tokenizer = Tokenizer(model_path=str(token_dictionary_path))
 # to the returned token-sequence.
 print(f"Converting input-string: '{INPUT_STRING}' to tokens.")
 input_tokens = tokenizer.encode(s=INPUT_STRING, bos=True, eos=True)
+print(f"Token representation is: {input_tokens}.")
+
 # The model expects int64's (i.e. LongTensor). The extra [] are there to add a batch-dimension.
 # Also, automatically add the beginning-of-sequence token.
 beginning_of_sequence_token = 128_000
