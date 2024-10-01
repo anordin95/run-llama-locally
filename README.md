@@ -31,7 +31,7 @@ With those initializations squared away, the model-architecture class can be ins
 The tokenizer is similarly available in [llama_models](https://github.com/meta-llama/llama-models) and relies on a dictionary-like file distributed along with the model-weights. I'm not sure why, but that file's strings (which map to unique integers or indices) are base64 encoded. Technically, you don't need to know that to use the Tokenizer, but if you're curious to see the actual tokens the system uses, make sure to decode appropriately!
 
 I believe most systems use beam-search rather than greedily taking the most-likely token at each time-step, so I implemented the same. Beam search takes the k (say 5) most likely
-tokens at the first time-step and uses them as a seed for k distinct sequences. For all future time-steps only the most likely token is appended to the sequence. At the end, the overall most likely sequence is selected.
+tokens at the first time-step and uses them as a seed for k distinct sequences. For all future time-steps, only the most likely token is appended to the sequence. At the end, the overall most likely sequence is selected.
 
 I can pretty comfortably run the 1B model on my Mac M1 Air's cpu with 16GB ram averaging about 1 token per second. The 3B model struggles and gets about 1 token every 60 seconds. And the 8B model typically gets killed by the OS for using too much memory. I tried using `mps` (Metal Performance Shaders), i.e. Apple's GPU, but received all `nan`'s as model output -- not sure why. 
 
