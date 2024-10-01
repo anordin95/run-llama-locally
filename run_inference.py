@@ -159,8 +159,9 @@ for beam_idx in range(beam_width):
                 # On the first pass, we want to initialize the beam-sequences with the most likely {beam-width}
                 # possible tokens. That is, beam 1 begins with the most likely token, beam 2 begins with
                 # the 2nd most likely token, etc.
-                next_most_likely_token = torch.topk(next_token_probabilities, k=beam_width, dim=0).indices[beam_idx].item()
-                most_likely_token_probability = torch.topk(next_token_probabilities, k=beam_width, dim=0).values[beam_idx].item()
+                top_k_results = torch.topk(next_token_probabilities, k=beam_width, dim=0)
+                next_most_likely_token = top_k_results.indices[beam_idx].item()
+                most_likely_token_probability = top_k_results.values[beam_idx].item()
                 
                 is_beams_first_inference_pass = False
 
