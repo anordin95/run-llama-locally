@@ -14,11 +14,13 @@ I was a bit surprised Meta didn't publish an example way to simply invoke one of
 
 4. `python run_inference.py`
 
-#### Arguments
+#### Script parameters
 
 The three global variables in run_inference.py: `MODEL_NAME`, `LLAMA_MODELS_DIR` and `INPUT_STRING` take the values you'd expect (there are adjacent comments with examples and more details too). They should be modified as you see fit.
 
 #### Technical Overview 
+
+##### Dependencies
 
 The minimal set of dependencies I found includes `torch` (perhaps, obviously), a lesser known library also published by Meta: `fairscale`, which implements a variety of highly scalable/parallelizable analogues of `torch` operators and `blobfile`, which implements a general file I/O mechanism that Meta's Tokenizer implementation uses.
 
@@ -28,10 +30,16 @@ With those initializations squared away, the model-architecture class can be ins
 
 The tokenizer is similarly available in [llama_models](https://github.com/meta-llama/llama-models) and relies on a dictionary-like file distributed along with the model-weights. I'm not sure why, but that file's strings (which map to unique integers or indices) are base64 encoded. Technically, you don't need to know that to use the Tokenizer, but if you're curious to see the actual tokens the system uses, make sure to decode appropriately!
 
+##### Beam-search
+
 I believe most systems use beam-search rather than greedily taking the most-likely token at each time-step, so I implemented the same. Beam search takes the k (say 5) most likely
 tokens at the first time-step and uses them as a seed for k distinct sequences. For all future time-steps, only the most likely token is appended to the sequence. At the end, the overall most likely sequence is selected.
 
-I can pretty comfortably run the 1B model on my Mac M1 Air's cpu with 16GB ram averaging about 1 token per second. The 3B model struggles and gets about 1 token every 60 seconds. And the 8B model typically gets killed by the OS for using too much memory. I tried using `mps` (Metal Performance Shaders), i.e. Apple's GPU, but received all `nan`'s as model output -- not sure why. 
+##### Performance notes
+
+I can pretty comfortably run the 1B model on my Mac M1 Air's cpu with 16GB ram averaging about 1 token per second. The 3B model struggles and gets about 1 token every 60 seconds. And the 8B model typically gets killed by the OS for using too much memory. 
+
+Initially, using `mps` (Metal Performance Shaders), i.e. Apple's GPU, would produce all `nan`'s as model output. The issue is due to a known-bug in `torch.triu` which I implemented a workaround for in the `llama-models` git submoudle. The inference time on the 1B model is notably faster, but the memory usage is much higher. It's not entirely clear to me why the memory usage would increase. I'm using a batch-size of 1, so there's no batch parallelism (i.e. presumably multiple full models in memory). And, the memory of each transformer layer should be relatively constant, unless perhaps each attention-heads' parameters are loaded into memory then discarded, whereas in the parallel (i.e. gpu) case all heads are simultaneously loaded.
 
 
 
