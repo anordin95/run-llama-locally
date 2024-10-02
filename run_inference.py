@@ -26,9 +26,8 @@ LLAMA_MODELS_DIR = Path.home() / ".llama" / "checkpoints"
 INPUT_STRING = "Write me a short story. It can be funny, emotional, intense, lovely, warm. It should be creative."
 
 # mps stands for Metal Performance Shaders, i.e. Apple GPU's.
-# Something went awry when I tried using mps; the model output a tensor 
-# full of nan's.
-DEVICE = torch.device("mps")
+# cpu is central processing unit (i.e. the typical computational device).
+DEVICE = torch.device("cpu")
 
 
 # ==========================================================================
