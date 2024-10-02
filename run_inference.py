@@ -23,12 +23,12 @@ print(f"\nUsing model: {MODEL_NAME}.\n")
 LLAMA_MODELS_DIR = Path.home() / ".llama" / "checkpoints"
 
 # This is the prompt/input you'd like to pass to the model.
-INPUT_STRING = "Please tell me a funny, quirky short-story."
+INPUT_STRING = "Write me a short story. It can be funny, emotional, intense, lovely, warm. It should be creative."
 
 # mps stands for Metal Performance Shaders, i.e. Apple GPU's.
 # Something went awry when I tried using mps; the model output a tensor 
 # full of nan's.
-DEVICE = torch.device("cpu")
+DEVICE = torch.device("mps")
 
 
 # ==========================================================================
@@ -60,6 +60,7 @@ llama_model = Llama3Model(model_hyperparams, DEVICE)
 model_weights_path = LLAMA_MODELS_DIR / f"{MODEL_NAME}/consolidated.00.pth"
 tensor_name_to_tensor_weights = torch.load(model_weights_path, weights_only=True, map_location=DEVICE)
 llama_model.load_state_dict(tensor_name_to_tensor_weights)
+llama_model = llama_model.to(DEVICE)
 
 # ==========================================================================
 # Setup and use the tokenizer.
@@ -85,12 +86,16 @@ input_batch = torch.LongTensor([input_tokens + [beginning_of_sequence_token]]).t
 # ==========================================================================
 # Run inference.
 
-beam_width = 5
+beam_width = 2
 beam_idx_to_token_sequence = {}
 beam_idx_to_sequence_log_probability = {}
 
-end_of_sequence_token = 128_001
-max_seq_len = 512
+# 128,001: <|end_of_text|> and 128,009: '<|eot_id|>'. I'm not sure what 'eot' 
+# stands for in this context, though I commonly observe that token in places where
+# there's a significant logical break in the text before and after.
+end_of_sequence_tokens = [128_001, 128_009]
+# Hm. May max out at 2,048. I need to test a bit more.
+max_seq_len = 4_096
 
 input_sequence_length = input_batch.shape[-1]
 
@@ -102,7 +107,7 @@ def append_token(tensor: torch.Tensor, token: int):
     assert tensor.shape[0] == 1
     # The [None, None] adds two empty dimensions to ensure the dimensions 
     # of token and tensor match.
-    token = torch.tensor(token, dtype=torch.int64)[None, None]
+    token = torch.tensor(token, dtype=torch.int64, device=DEVICE)[None, None]
     return torch.cat([tensor, token], dim=1)
 
 for beam_idx in range(beam_width):
@@ -120,7 +125,7 @@ for beam_idx in range(beam_width):
         output_sequence_length = beam_sequence.shape[-1] - input_sequence_length
         
         if (
-            next_most_likely_token == end_of_sequence_token or
+            next_most_likely_token in end_of_sequence_tokens or
             output_sequence_length >= max_seq_len
         ):
             if output_sequence_length >= max_seq_len:
@@ -180,8 +185,9 @@ for beam_idx in range(beam_width):
                 next_most_likely_token_str = next_most_likely_token_str.replace("\n", "\\n")
             
             # Pad the numeric representation so the ensuing print-statement's contents are aligned across lines.
-            # For example, 126 -> "126  "; 1 -> "1    "; 52947 -> "52947". The longest token is 6 digits: 128000.
-            next_most_likely_token_padded = f"{next_most_likely_token}{' ' * (6 - len(str(next_most_likely_token)))}"
+            # For example, 126 -> "126  "; 1 -> "1    "; 52947 -> "52947". The longest token (128000) 
+            # formatted with a comma has 7 characters: 6 digits and the comma.
+            next_most_likely_token_padded = f"{next_most_likely_token:,}{' ' * (7 - len(f"{next_most_likely_token:,}"))}"
             print(f"next token {next_most_likely_token_padded}-> '{next_most_likely_token_str}' with p: {most_likely_token_probability:.3f}.")
 
 # Decode each beam's output sequence.
