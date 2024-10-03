@@ -8,11 +8,15 @@ I was a bit surprised Meta didn't publish an example way to simply invoke one of
 
 1. Download the relevant model weight(s) via https://www.llama.com/llama-downloads/
 
-2. `pip install -r requirements.txt`
+2. `$ pip install -r requirements.txt`
 
-3. `cd llama-models; pip install -e .; cd ..`
+3. `$ cd llama-models; pip install -e .; cd ..`
 
-4. `python run_inference.py`
+4. `$ python minimal_run_inference.py` or `$ python run_inference.py`
+
+#### Exploring the model & outputs
+
+`run_inference.py`, as the name suggests, is more bloated than `minimal_run_inference.py`. It implements beam-search & features far more explanatory comments.`minimal_run_inference.py` is a simple, few lines of code to run the Llama models. It's a great place to start hacking around or exploring on your own. If one of the steps in it doesn't make sense, peek back at `run_inference.py` where there are likely detailed comments.
 
 #### Script parameters
 

@@ -2,6 +2,7 @@ import json
 import time
 from pathlib import Path
 import math
+import time
 
 from llama_models.llama3.reference_impl.model import Transformer as Llama3Model
 from llama_models.llama3.api.args import ModelArgs
@@ -94,7 +95,7 @@ beam_idx_to_sequence_log_probability = {}
 # there's a significant logical break in the text before and after.
 end_of_sequence_tokens = [128_001, 128_009]
 # Hm. May max out at 2,048. I need to test a bit more.
-max_seq_len = 4_096
+max_seq_len = 128
 
 input_sequence_length = input_batch.shape[-1]
 
@@ -115,6 +116,7 @@ for beam_idx in range(beam_width):
     
     beam_sequence_log_probability = 0.0
     beam_sequence = input_batch
+    beam_start_time = time.time()
     is_beams_first_inference_pass = True
     next_most_likely_token = None
     
@@ -127,6 +129,7 @@ for beam_idx in range(beam_width):
             next_most_likely_token in end_of_sequence_tokens or
             output_sequence_length >= max_seq_len
         ):
+            
             if output_sequence_length >= max_seq_len:
                 print(f"Reached maximum sequence length of: {max_seq_len}.")
 
@@ -135,6 +138,9 @@ for beam_idx in range(beam_width):
             # Store the token-sequence & log-probability.
             beam_idx_to_token_sequence[beam_idx] = beam_output_sequence.squeeze().tolist()
             beam_idx_to_sequence_log_probability[beam_idx] = beam_sequence_log_probability
+
+            beam_time_elapsed = time.time() - beam_start_time
+            print(f"Total time elapsed: {beam_time_elapsed:.0f}s. {output_sequence_length / beam_time_elapsed:.2f} tokens/second.")
             
             break
 
