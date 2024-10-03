@@ -2,7 +2,10 @@
 
 #### Motivation
 
-I was a bit surprised Meta didn't publish an example way to simply invoke one of these LLM's with only `torch` (or some minimal set of dependencies), though I am obviously grateful and so pleased with their contribution of the public weights! There are other popular ways to invoke these models, such as [Ollama](https://ollama.com/) and Hugging-Face's general API package: [transformers](https://pypi.org/project/transformers/), but those hide the interesting details behind an API. I want to peel back the layers, poke, prod, understand and gain insight into these models and help you do the same.
+I want to peel back the layers of the onion and other gluey-mess to gain insight into these models. 
+
+There are other popular ways to invoke these models, such as [Ollama](https://ollama.com/) and Hugging-Face's general API package: [transformers](https://pypi.org/project/transformers/), but those hide the interesting details behind an API. 
+I was a bit surprised Meta didn't publish an example way to simply invoke one of these LLM's with only `torch` (or some minimal set of dependencies), though I am obviously grateful and so pleased with their contribution of the public weights! 
 
 #### Setup steps
 
