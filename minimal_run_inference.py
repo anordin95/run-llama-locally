@@ -15,7 +15,7 @@ import torch.distributed
 MODEL_NAME = "Llama3.2-1B-Instruct" 
 LLAMA_MODELS_DIR = Path.home() / ".llama" / "checkpoints"
 INPUT_STRING = "Write me a short story."
-DEVICE = torch.device("mps")
+DEVICE = torch.device("cpu")
 
 # Initialize torch.distributed & fairscale.
 torch.distributed.init_process_group(world_size=1, rank=0, store=torch.distributed.HashStore())
