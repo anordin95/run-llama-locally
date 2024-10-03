@@ -34,8 +34,6 @@ tensor_name_to_tensor_weights = torch.load(model_weights_path, weights_only=True
 llama_model.load_state_dict(tensor_name_to_tensor_weights)
 llama_model = llama_model.to(DEVICE)
 
-model_parameters = list(llama_model.parameters())
-
 # Setup the tokenizer & input-sequence.
 beginning_of_sequence_token = 128_000
 token_dictionary_path = LLAMA_MODELS_DIR / f"{MODEL_NAME}/tokenizer.model"
