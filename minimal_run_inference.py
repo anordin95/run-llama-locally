@@ -44,4 +44,5 @@ input_batch = torch.LongTensor([input_tokens + [beginning_of_sequence_token]]).t
 output_batch = llama_model(input_batch, start_pos=0)
 # Take the first batch-entry & final token-index.
 final_token_activations = output_batch[0][-1]
+token_distribution = final_token_activations.softmax(dim=0)
 

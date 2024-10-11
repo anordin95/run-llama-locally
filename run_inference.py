@@ -86,9 +86,10 @@ input_batch = torch.LongTensor([input_tokens + [beginning_of_sequence_token]]).t
 # ==========================================================================
 # Run inference.
 
-beam_width = 2
+beam_width = 5
 beam_idx_to_token_sequence = {}
 beam_idx_to_sequence_log_probability = {}
+beam_idx_to_time_elapsed = {}
 
 # 128,001: <|end_of_text|> and 128,009: '<|eot_id|>'. I'm not sure what 'eot' 
 # stands for in this context, though I commonly observe that token in places where
@@ -138,9 +139,7 @@ for beam_idx in range(beam_width):
             # Store the token-sequence & log-probability.
             beam_idx_to_token_sequence[beam_idx] = beam_output_sequence.squeeze().tolist()
             beam_idx_to_sequence_log_probability[beam_idx] = beam_sequence_log_probability
-
-            beam_time_elapsed = time.time() - beam_start_time
-            print(f"Total time elapsed: {beam_time_elapsed:.0f}s. {output_sequence_length / beam_time_elapsed:.2f} tokens/second.")
+            beam_idx_to_time_elapsed[beam_idx] = time.time() - beam_start_time
             
             break
 
@@ -201,5 +200,7 @@ for beam_idx in range(beam_width):
     beam_sequence = beam_idx_to_token_sequence[beam_idx]
     beam_log_probability = beam_idx_to_sequence_log_probability[beam_idx]
     decoded_beam_tokens = tokenizer.decode(t=beam_sequence)
+    beam_time_elapsed = beam_idx_to_time_elapsed[beam_idx]
 
-    print(f"\n\nBeam: {beam_idx+1} predicted tokens with joint log-p: {beam_log_probability:.2f} that correspond to this string: \n{decoded_beam_tokens}")
+    print(f"\n\nBeam {beam_idx+1} ran for: {beam_time_elapsed:.0f}s. The average throughput was {len(beam_sequence) / beam_time_elapsed:.2f} tokens/second.")
+    print(f"Beam: {beam_idx+1} predicted tokens with joint log-p: {beam_log_probability:.2f} that correspond to this string: \n{decoded_beam_tokens}")
