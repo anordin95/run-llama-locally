@@ -4,7 +4,7 @@
 
 I want to peel back the layers of the onion and other gluey-mess to gain insight into these models. 
 
-There are other popular ways to invoke these models, such as [Ollama](https://ollama.com/) and Hugging-Face's general API package: [transformers](https://pypi.org/project/transformers/), but those hide the interesting details behind an API. 
+There are other popular (and likely more performant) ways to invoke these models, such as [Ollama](https://ollama.com/), [torchchat](https://github.com/pytorch/torchchat), [llamafile](https://github.com/Mozilla-Ocho/llamafile) and Hugging-Face's general API package: [transformers](https://pypi.org/project/transformers/). But those hide the interesting details -- things like the activations in each layer, the weights and their shapes, the output probability distribution, etc. -- behind an API. 
 I was a bit surprised Meta didn't publish an example way to simply invoke one of these LLM's with only `torch` (or some minimal set of dependencies), though I am obviously grateful and so pleased with their contribution of the public weights! 
 
 ### Setup steps
@@ -46,7 +46,7 @@ tokens at the first time-step and uses them as a seed for k distinct sequences. 
 
 #### Performance notes
 
-Using CPU, I can pretty comfortably run the 1B model on my Mac M1 Air's that has 16GB of RAM averaging about 1 token per second. The 3B model struggles and gets about 1 token every 60 seconds. And the 8B model typically gets killed by the OS for using too much memory. 
+Using CPU, I can pretty comfortably run the 1B model on my Mac M1 Air that has 16GB of RAM averaging about 1 token per second. The 3B model struggles and gets about 1 token every 60 seconds. And the 8B model typically gets killed by the OS for using too much memory. 
 
 Initially, using `mps` (Metal Performance Shaders), i.e. Apple's GPU, would produce all `nan`'s as model output. The issue is due to a known-bug in `torch.triu` which I implemented a workaround for in the `llama-models` git submoudle. 
 
